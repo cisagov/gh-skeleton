@@ -1,0 +1,190 @@
+#!/bin/bash
+set -o nounset
+set -o errexit
+set -o pipefail
+
+# Define terminal colors for use in logger functions
+BLUE="\x1B[34m"
+GREEN="\x1B[32m"
+RED="\x1B[31m"
+RESET="\x1B[0m"
+YELLOW="\x1B[33m"
+
+log_info() {
+  echo -e "${BLUE}* $*${RESET}"
+}
+
+log_ok() {
+  echo -e "${GREEN}✓ $*${RESET}"
+}
+
+log_warn() {
+  echo -e "${YELLOW}⚠︎ $*${RESET}"
+}
+
+log_error() {
+  echo -e "${RED}! $*${RESET}"
+}
+
+# Determine if an executable is in the PATH
+if ! type -p perl > /dev/null; then
+  log_error "perl not found on the system and is required" >&2
+  exit 1
+fi
+
+USAGE=$(
+  cat << 'END_OF_LINE'
+Helper tool to start a new github project from a skeleton github repository.
+
+Usage:
+  gh skeleton (-h | --help)
+  gh skeleton list [--org=<name>]
+  gh skeleton clone [options] <parent-repo-name> <new-repo-name>
+
+Options:
+  -c --change-dir=<dir>  Create clone in this directory.
+  -h --help              Show this message.
+  -o --org=<name>        Organization to search [default: cisagov].
+END_OF_LINE
+)
+
+# Directory to use as the clone destination
+CHANGE_DIR="."
+
+# Organization to search for skeletons
+ORGANIZATION="cisagov"
+
+# Positional parameters
+PARAMS=""
+
+print_available_skeletons() {
+  org_name=$1
+  QUERY="
+  query {
+    search(query: \"org:$org_name topic:skeleton archived:false\", type: REPOSITORY, first: 100) {
+      repositoryCount
+      edges {
+        node {
+          ... on Repository {
+            name
+            description
+          }
+        }
+      }
+    }
+  }
+  "
+
+  # shellcheck disable=2016
+  # disable single quote expansion warning
+  TEMPLATE='
+    {{- range $repo := .data.search.edges -}}
+      {{- printf "%-25s\t%s\n" $repo.node.name $repo.node.description -}}
+    {{- end -}}
+  '
+
+  echo "Available skeletons in $org_name:"
+  echo
+  exec gh api graphql \
+    --raw-field query="${QUERY}" --paginate \
+    --template="${TEMPLATE}" | sort
+}
+
+clone_repo() {
+  parent_repo=$1
+  new_repo=$2
+  org_name=$3
+
+  log_info "Clone skeleton remote repository to the new local repository."
+  git clone --origin "${parent_repo}" git@github.com:"${org_name}/${parent_repo}".git "${new_repo}"
+
+  cd "${new_repo}"
+
+  log_info "Disable pushing to the upstream (parent) repository."
+  git remote set-url --push "${parent_repo}" no_push
+
+  log_info "Add a new remote origin for the this repository."
+  git remote add origin git@github.com:"${org_name}/${new_repo}".git
+
+  log_info "Search and replace repository name in source files."
+  find . \( ! -regex '.*/\.git/.*' \) -type f -exec \
+    perl -pi -e "s/${parent_repo}/${new_repo}/g" {} \;
+
+  log_info "Create the lineage.yml file."
+  cat << END_OF_LINE > .github/lineage.yml
+---
+lineage:
+  skeleton:
+    remote-url: https://github.com/${org_name}/${parent_repo}.git
+version: '1'
+END_OF_LINE
+
+  log_info "Stage modified files."
+  git add --verbose .
+
+  log_info "Commit staged files to the new repository."
+  git commit --message "Rename repository references after clone."
+
+  log_ok "Success!"
+
+  # Echo instuctions to user
+  cat << END_OF_LINE
+The repository "${parent_repo}" has been cloned and renamed to "${new_repo}".
+Use the following commands to push the new repository to github:
+    cd ${new_repo}
+    git checkout -b first-commits
+    git push origin develop first-commits --set-upstream
+
+END_OF_LINE
+}
+
+# Parse command line arguments
+while (("$#")); do
+  case "$1" in
+    -c | --change-dir)
+      CHANGE_DIR="$2"
+      shift
+      ;;
+    -h | --help)
+      echo "${USAGE}"
+      exit 0
+      ;;
+    -o | --org)
+      ORGANIZATION="$2"
+      shift
+      ;;
+    -*) # unsupported flags
+      echo "Error: Unsupported skeleton flag $1" >&2
+      exit 1
+      ;;
+    *) # preserve positional arguments
+      PARAMS="$PARAMS $1"
+      ;;
+  esac
+  shift
+done
+
+# set positional arguments in their proper place
+eval set -- "$PARAMS"
+
+case "$1" in
+  clone)
+    if [[ $# -lt 3 ]]; then
+      echo "Clone command requires <parent-repo-name> <new-repo-name>"
+      echo
+      echo "${USAGE}"
+      exit 0
+    fi
+    pushd "${CHANGE_DIR}"
+    clone_repo "$2" "$3" "${ORGANIZATION}"
+    popd
+    ;;
+  list)
+    print_available_skeletons "${ORGANIZATION}"
+    ;;
+  *)
+    echo "Unknown command $1"
+    echo "${USAGE}"
+    exit 255
+    ;;
+esac
