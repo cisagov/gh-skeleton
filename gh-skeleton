@@ -172,7 +172,7 @@ case "$1" in
       echo "Clone command requires <parent-repo-name> <new-repo-name>"
       echo
       echo "${USAGE}"
-      exit 0
+      exit 255
     fi
     if [[ -n ${CHANGE_DIR} ]]; then
       pushd "${CHANGE_DIR}" 1> /dev/null
