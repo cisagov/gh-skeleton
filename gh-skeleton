@@ -124,10 +124,11 @@ END_OF_LINE
   # Echo instuctions to user
   cat << END_OF_LINE
 The repository "${parent_repo}" has been cloned and renamed to "${new_repo}".
-Use the following commands to push the new repository to github:
+Use the following commands to push the new repository to GitHub and create a pull request:
     cd ${CHANGE_DIR:+${CHANGE_DIR}/}${new_repo}
     git checkout -b first-commits
     git push origin develop first-commits --set-upstream
+    gh pr create --title "First commits" --assignee=@me --web
 
 END_OF_LINE
 }
