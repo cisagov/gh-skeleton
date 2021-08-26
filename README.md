@@ -2,22 +2,57 @@
 
 [![GitHub Build Status](https://github.com/cisagov/gh-skeleton/workflows/build/badge.svg)](https://github.com/cisagov/gh-skeleton/actions)
 
-This is a generic skeleton project that can be used to quickly get a
-new [cisagov](https://github.com/cisagov) GitHub project started.
-This skeleton project contains [licensing information](LICENSE), as
-well as [pre-commit hooks](https://pre-commit.com) and
-[GitHub Actions](https://github.com/features/actions) configurations
-appropriate for the major languages that we use.
+This extension for the [`gh` CLI] provides the
+ability to clone repositories from our existing library of skeleton
+repositories.
 
-In many cases you will instead want to use one of the more specific
-skeleton projects derived from this one.
+## Prerequisites ##
 
-## New Repositories from a Skeleton ##
+A working installation of the [`gh` CLI].
 
-Please see our [Project Setup guide](https://github.com/cisagov/development-guide/tree/develop/project_setup)
-for step-by-step instructions on how to start a new repository from
-a skeleton. This will save you time and effort when configuring a
-new repository!
+## Installation ##
+
+To install the extension issue the following command:
+
+```console
+gh extension install cisagov/gh-skeleton
+```
+
+## Usage ##
+
+To list the available skeletons:
+
+```console
+gh skeleton list
+```
+
+To create a new local repository from a skeleton:
+
+```console
+gh skeleton clone skeleton-generic my-repo
+```
+
+Additional help is available from the extension:
+
+```console
+gh skeleton --help
+```
+
+## Updating ##
+
+To update the extension issue the following command:
+
+```console
+gh extension upgrade skeleton
+```
+
+## Uninstalling ##
+
+To uninstall the extension issue the following command:
+
+```console
+gh extension remove skeleton
+```
 
 ## Contributing ##
 
@@ -36,3 +71,5 @@ dedication](https://creativecommons.org/publicdomain/zero/1.0/).
 All contributions to this project will be released under the CC0
 dedication. By submitting a pull request, you are agreeing to comply
 with this waiver of copyright interest.
+
+[`gh` CLI]: https://github.com/cli/cli
