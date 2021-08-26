@@ -154,7 +154,7 @@ while (("$#")); do
       ;;
     -*) # unsupported flags
       echo "Error: Unsupported skeleton flag $1" >&2
-      exit 1
+      exit 255
       ;;
     *) # preserve positional arguments
       PARAMS="$PARAMS $1"
