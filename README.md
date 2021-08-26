@@ -12,7 +12,7 @@ A working installation of the [`gh` CLI].
 
 ## Installation ##
 
-To install the extension issue the following command:
+To install the extension:
 
 ```console
 gh extension install cisagov/gh-skeleton
@@ -40,7 +40,7 @@ gh skeleton --help
 
 ## Updating ##
 
-To update the extension issue the following command:
+To update the extension:
 
 ```console
 gh extension upgrade skeleton
@@ -48,7 +48,7 @@ gh extension upgrade skeleton
 
 ## Uninstalling ##
 
-To uninstall the extension issue the following command:
+To uninstall the extension:
 
 ```console
 gh extension remove skeleton
