@@ -3,6 +3,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Default organization to search for skeletons
+ORGANIZATION="cisagov"
+
 # Define terminal colors for use in logger functions
 BLUE="\x1B[34m"
 GREEN="\x1B[32m"
@@ -33,8 +36,8 @@ if ! type -p perl > /dev/null; then
 fi
 
 USAGE=$(
-  cat << 'END_OF_LINE'
-Helper tool to start a new github project from a skeleton github repository.
+  cat << END_OF_LINE
+gh extension to start a new github project from a skeleton github repository.
 
 Usage:
   gh skeleton (-h | --help)
@@ -44,18 +47,9 @@ Usage:
 Options:
   -c --change-dir=<dir>  Create clone in this directory.
   -h --help              Show this message.
-  -o --org=<name>        Organization to search [default: cisagov].
+  -o --org=<name>        Organization to search [default: ${ORGANIZATION}].
 END_OF_LINE
 )
-
-# Directory to use as the clone destination
-CHANGE_DIR="."
-
-# Organization to search for skeletons
-ORGANIZATION="cisagov"
-
-# Positional parameters
-PARAMS=""
 
 print_available_skeletons() {
   org_name=$1
@@ -131,12 +125,16 @@ END_OF_LINE
   cat << END_OF_LINE
 The repository "${parent_repo}" has been cloned and renamed to "${new_repo}".
 Use the following commands to push the new repository to github:
-    cd ${new_repo}
+    cd ${CHANGE_DIR:+${CHANGE_DIR}/}${new_repo}
     git checkout -b first-commits
     git push origin develop first-commits --set-upstream
 
 END_OF_LINE
 }
+
+# Initialize positional parameters and flag variables
+CHANGE_DIR=""
+PARAMS=""
 
 # Parse command line arguments
 while (("$#")); do
@@ -175,9 +173,13 @@ case "$1" in
       echo "${USAGE}"
       exit 0
     fi
-    pushd "${CHANGE_DIR}"
-    clone_repo "$2" "$3" "${ORGANIZATION}"
-    popd
+    if [[ -n ${CHANGE_DIR} ]]; then
+      pushd "${CHANGE_DIR}" 1> /dev/null
+      clone_repo "$2" "$3" "${ORGANIZATION}"
+      popd 1> /dev/null
+    else
+      clone_repo "$2" "$3" "${ORGANIZATION}"
+    fi
     ;;
   list)
     print_available_skeletons "${ORGANIZATION}"
