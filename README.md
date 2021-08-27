@@ -2,7 +2,7 @@
 
 [![GitHub Build Status](https://github.com/cisagov/gh-skeleton/workflows/build/badge.svg)](https://github.com/cisagov/gh-skeleton/actions)
 
-This extension for the [`gh` CLI] provides the ability easily start new projects
+This extension for the [`gh` CLI] provides the ability to easily start new projects
 from our [existing library of skeleton
 repositories](https://github.com/search?q=org%3Acisagov+org%3Acisagov+topic%3Askeleton+archived%3Afalse).
 
