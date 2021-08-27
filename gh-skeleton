@@ -31,7 +31,7 @@ log_error() {
 
 # Determine if an executable is in the PATH
 if ! type -p perl > /dev/null; then
-  log_error "perl not found on the system and is required" >&2
+  log_error "Perl not found on the system and is required" >&2
   exit 1
 fi
 
