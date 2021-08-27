@@ -8,7 +8,8 @@ repositories](https://github.com/search?q=org%3Acisagov+org%3Acisagov+topic%3Ask
 
 ## Prerequisites ##
 
-A working installation of the [`gh` CLI].
+- A working installation of the [`gh` CLI].
+- An [authenticated GitHub account](https://cli.github.com/manual/gh_auth_login).
 
 ## Installation ##
 
