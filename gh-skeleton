@@ -37,7 +37,7 @@ fi
 
 USAGE=$(
   cat << END_OF_LINE
-gh extension to start a new github project from a skeleton github repository.
+gh extension to start a new GitHub project from a skeleton GitHub repository.
 
 Usage:
   gh skeleton (-h | --help)
