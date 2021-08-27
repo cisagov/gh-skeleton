@@ -70,7 +70,7 @@ print_available_skeletons() {
   "
 
   # shellcheck disable=2016
-  # disable single quote expansion warning
+  # Disable single quote expansion warning as we want to supress parameter expansion in a Go template.
   TEMPLATE='
     {{- range $repo := .data.search.edges -}}
       {{- printf "%-25s\t%s\n" $repo.node.name $repo.node.description -}}
