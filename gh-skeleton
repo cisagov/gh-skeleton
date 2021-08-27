@@ -42,14 +42,14 @@ gh extension to start a new GitHub project from a skeleton GitHub repository.
 
 Usage:
   gh skeleton (-h | --help)
-  gh skeleton list [--org=<name>]
+  gh skeleton list [--src-org <name>]
   gh skeleton clone [options] <parent-repo-name> <new-repo-name>
 
 Options:
-  -c --change-dir=<dir> Create clone in this directory.
-  -d --dest-org=<name>  Organization to create clone into [default: ${DEST_ORG}].
+  -c --change-dir <dir> Create clone in this directory.
+  -d --dest-org <name>  Organization to create clone into [default: ${DEST_ORG}].
   -h --help             Show this message.
-  -s --src-org=<name>   Organization to search for skeletons [default: ${SRC_ORG}].
+  -s --src-org <name>   Organization to search for skeletons [default: ${SRC_ORG}].
 END_OF_LINE
 )
 
