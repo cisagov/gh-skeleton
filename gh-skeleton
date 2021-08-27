@@ -117,7 +117,7 @@ END_OF_LINE
   git add --verbose .
 
   log_info "Commit staged files to the new repository."
-  git commit --message "Rename repository references after clone."
+  git commit --message "Rename repository references after clone"
 
   log_ok "Success!"
 
