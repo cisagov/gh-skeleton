@@ -103,15 +103,15 @@ clone_repo() {
 
   log_info "Creating ${dest_org}/${dest_repo} from skeleton ${src_org}/${src_repo}."
 
-  log_info "Clone skeleton remote repository to the new local repository."
+  log_info "Cloning skeleton remote repository to the new local repository."
   git clone --origin "${src_repo}" git@github.com:"${src_org}/${src_repo}".git "${dest_repo}"
 
   cd "${dest_repo}"
 
-  log_info "Disable pushing to the upstream (parent) repository."
+  log_info "Disabling pushing to the upstream (parent) repository."
   git remote set-url --push "${src_repo}" no_push
 
-  log_info "Create the lineage.yml file."
+  log_info "Creating the lineage.yml file."
   cat << END_OF_LINE > .github/lineage.yml
 ---
 lineage:
@@ -120,23 +120,23 @@ lineage:
 version: '1'
 END_OF_LINE
 
-  log_info "Stage modified files."
+  log_info "Staging modified files."
   git add --verbose .
 
-  log_info "Commit staged files to the develop branch."
+  log_info "Committing staged files to the develop branch."
   git commit --message "Add lineage configuration"
 
   log_info "Creating first-commits branch."
   git checkout -b first-commits
 
-  log_info "Search and replace repository name in source files."
+  log_info "Searching and replacing repository name in source files."
   find . \( ! -regex '.*/\.git/.*' \) -type f -exec \
     perl -pi -e "s/${src_repo}/${dest_repo}/g" {} \;
 
-  log_info "Stage modified files."
+  log_info "Staging modified files."
   git add --verbose .
 
-  log_info "Commit staged files to the first-commits branch."
+  log_info "Committing staged files to the first-commits branch."
   git commit --message "Rename repository references after clone"
 
   remote_repo_status="unknown"
@@ -160,7 +160,7 @@ END_OF_LINE
       log_ok "The remote repository ${dest_org}/${dest_repo} was successfully created."
       ;;&
     existed | failed)
-      log_info "Add a new remote origin for the this repository."
+      log_info "Adding a new remote origin for the this repository."
       # We can add the remote origin now since gh was unable to do it.
       git remote add origin git@github.com:"${dest_org}/${dest_repo}".git
       ;;&
