@@ -124,7 +124,7 @@ END_OF_LINE
   git add --verbose .
 
   log_info "Commit staged files to the develop branch."
-  git commit --message "Adding lineage configuration"
+  git commit --message "Add lineage configuration"
 
   log_info "Creating first-commits branch."
   git checkout -b first-commits
