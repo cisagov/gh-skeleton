@@ -111,6 +111,16 @@ clone_repo() {
   log_info "Disabling pushing to the upstream (parent) repository."
   git remote set-url --push "${src_repo}" no_push
 
+  log_info "Searching and replacing repository name in source files."
+  find . \( ! -regex '.*/\.git/.*' \) -type f -exec \
+    perl -pi -e "s/${src_repo}/${dest_repo}/g" {} \;
+
+  log_info "Staging modified files."
+  git add --verbose .
+
+  log_info "Committing staged files to the develop branch."
+  git commit --message "Rename repository references after clone"
+
   log_info "Creating the lineage.yml file."
   cat << END_OF_LINE > .github/lineage.yml
 ---
@@ -128,16 +138,6 @@ END_OF_LINE
 
   log_info "Creating first-commits branch."
   git checkout -b first-commits
-
-  log_info "Searching and replacing repository name in source files."
-  find . \( ! -regex '.*/\.git/.*' \) -type f -exec \
-    perl -pi -e "s/${src_repo}/${dest_repo}/g" {} \;
-
-  log_info "Staging modified files."
-  git add --verbose .
-
-  log_info "Committing staged files to the first-commits branch."
-  git commit --message "Rename repository references after clone"
 
   remote_repo_status="unknown"
   log_info "Checking for remote repository ${dest_org}/${dest_repo}."
