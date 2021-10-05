@@ -159,12 +159,12 @@ END_OF_LINE
     created)
       log_ok "The remote repository ${dest_org}/${dest_repo} was successfully created."
       ;;&
-    existed | failed)
+    exists | failed)
       log_info "Adding a new remote origin for the repository."
       # We can add the remote origin now since gh was unable to do it.
       git remote add origin git@github.com:"${dest_org}/${dest_repo}".git
       ;;&
-    created | existed)
+    created | exists)
       log_info "Pushing develop and first-commit branches to the remote."
       git push origin develop first-commits --set-upstream
       log_info "Opening a new pull request for the first-commits branch."
