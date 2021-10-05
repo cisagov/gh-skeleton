@@ -160,7 +160,7 @@ END_OF_LINE
       log_ok "The remote repository ${dest_org}/${dest_repo} was successfully created."
       ;;&
     existed | failed)
-      log_info "Adding a new remote origin for the this repository."
+      log_info "Adding a new remote origin for the repository."
       # We can add the remote origin now since gh was unable to do it.
       git remote add origin git@github.com:"${dest_org}/${dest_repo}".git
       ;;&
