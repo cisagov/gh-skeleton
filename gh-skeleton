@@ -144,7 +144,7 @@ END_OF_LINE
   remote_repo_name=$(gh repo view --json name --jq ".name" "${dest_org}/${dest_repo}") || :
   if [[ -n ${remote_repo_name} ]]; then
     log_ok "${dest_org}/${dest_repo} exists."
-    remote_repo_status="existed"
+    remote_repo_status="exists"
   else
     log_warn "${dest_org}/${dest_repo} does not yet exist."
     log_info "Attempting to create a new remote repository."
