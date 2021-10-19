@@ -174,7 +174,7 @@ END_OF_LINE
       log_ok "Success!"
       ;;
     failed)
-      log_warn "The remote repository ${dest_org}/${dest_repo} counld not be created."
+      log_warn "The remote repository ${dest_org}/${dest_repo} could not be created."
       cat << END_OF_LINE
 ${dest_org}/${dest_repo} was created locally from the ${src_repo} skeleton.
 A remote repository was unable to be created automatically.
