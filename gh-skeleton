@@ -215,10 +215,27 @@ configure_branch_protection() {
   dest_org=$2
   branch=$3
 
-  # Note: Only organization repositories can have users and team restrictions.
-  # This request will fail with error 422 if the repository is not in an organization.
+  # Organizations have a different API than personal accounts.
+  # Determine what dest_org is pointing at and route to the appropriate function.
 
-  log_info "Configuring branch protection for ${dest_org}/${dest_repo}/${branch}."
+  log_info "Determining organization type for $dest_org."
+  is_real_org=true
+  gh api "/orgs/$dest_org" --silent || is_real_org=false
+  if [ $is_real_org = true ]; then
+    configure_org_branch_protection "$dest_repo" "$dest_org" "$branch"
+  else
+    configure_user_branch_protection "$dest_repo" "$dest_org" "$branch"
+  fi
+}
+
+configure_org_branch_protection() {
+  dest_repo=$1
+  dest_org=$2
+  branch=$3
+
+  # Note: Only organization repositories can have users and team restrictions.
+
+  log_info "Configuring organization branch protection for ${dest_org}/${dest_repo}/${branch}."
 
   jq -n "{
       required_status_checks: {
@@ -241,6 +258,29 @@ configure_branch_protection() {
         teams: [],
         apps: [],
       },
+    }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input -
+}
+
+configure_user_branch_protection() {
+  dest_repo=$1
+  dest_org=$2
+  branch=$3
+
+  log_info "Configuring user branch protection for ${dest_org}/${dest_repo}/${branch}."
+
+  jq -n "{
+      required_status_checks: {
+        strict: true,
+        contexts: [\"lint\", \"test\", \"CodeQL\"],
+      },
+      enforce_admins: true,
+      required_conversation_resolution: true,
+      required_pull_request_reviews: {
+        dismiss_stale_reviews: false,
+        require_code_owner_reviews: true,
+        required_approving_review_count: 2,
+      },
+      restrictions: null,
     }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input -
 }
 
