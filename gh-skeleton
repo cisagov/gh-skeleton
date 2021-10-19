@@ -1,0 +1,254 @@
+#!/usr/bin/env bash
+set -o nounset
+set -o errexit
+set -o pipefail
+
+# Default organizations
+DEST_ORG="cisagov"
+SRC_ORG="cisagov"
+
+# Define terminal colors for use in logger functions
+BLUE="\x1B[34m"
+GREEN="\x1B[32m"
+RED="\x1B[31m"
+RESET="\x1B[0m"
+YELLOW="\x1B[33m"
+
+log_info() {
+  echo -e "${BLUE}* $*${RESET}"
+}
+
+log_ok() {
+  echo -e "${GREEN}✓ $*${RESET}"
+}
+
+log_warn() {
+  echo -e "${YELLOW}⚠︎ $*${RESET}"
+}
+
+log_error() {
+  echo -e "${RED}! $*${RESET}" >&2
+}
+
+# Determine if an executable is in the PATH
+if ! type -p perl > /dev/null; then
+  log_error "Perl not found on the system and is required."
+  exit 1
+fi
+
+USAGE=$(
+  cat << END_OF_LINE
+GitHub CLI extension to start a new GitHub project from a skeleton GitHub repository.
+
+Usage:
+  gh skeleton (-h | --help)
+  gh skeleton list [--src-org <name>]
+  gh skeleton clone [options] <parent-repo-name> <new-repo-name>
+
+Options:
+  -c --change-dir <dir> Create clone in this directory.
+  -d --dest-org <name>  Organization to create clone into [default: ${DEST_ORG}].
+  -h --help             Show this message.
+  -s --src-org <name>   Organization to search for skeletons [default: ${SRC_ORG}].
+END_OF_LINE
+)
+
+print_available_skeletons() {
+  src_org=$1
+  QUERY="
+  query {
+    search(query: \"org:$src_org topic:skeleton archived:false\", type: REPOSITORY, first: 100) {
+      repositoryCount
+      edges {
+        node {
+          ... on Repository {
+            name
+            description
+          }
+        }
+      }
+    }
+  }
+  "
+
+  # shellcheck disable=2016
+  # Disable single quote expansion warning as we want to suppress
+  # parameter expansion in a Go template.
+  TEMPLATE='
+    {{- range $repo := .data.search.edges -}}
+      {{- printf "%-25s\t%s\n" $repo.node.name $repo.node.description -}}
+    {{- end -}}
+  '
+
+  echo "Available skeletons in $src_org:"
+  echo
+  exec gh api graphql \
+    --raw-field query="${QUERY}" --paginate \
+    --template="${TEMPLATE}" | sort
+}
+
+clone_repo() {
+  src_repo=$1
+  dest_repo=$2
+  src_org=$3
+  dest_org=$4
+
+  # Before we continue check to see if the user is logged in. If there is no
+  # currently authenticated user gh will ask the user to run the "gh auth login"
+  # command and exit with return code 4.  This will cause this script to halt.
+  username=$(gh api user --jq '.login')
+
+  # If we got here we know we have an authenticated user.
+  log_ok "You are logged into GitHub as ${username}."
+
+  log_info "Creating ${dest_org}/${dest_repo} from skeleton ${src_org}/${src_repo}."
+
+  log_info "Cloning skeleton remote repository to the new local repository."
+  git clone --origin "${src_repo}" git@github.com:"${src_org}/${src_repo}".git "${dest_repo}"
+
+  cd "${dest_repo}"
+
+  log_info "Disabling pushing to the upstream (parent) repository."
+  git remote set-url --push "${src_repo}" no_push
+
+  log_info "Searching and replacing repository name in source files."
+  find . \( ! -regex '.*/\.git/.*' \) -type f -exec \
+    perl -pi -e "s/${src_repo}/${dest_repo}/g" {} \;
+
+  log_info "Staging modified files."
+  git add --verbose .
+
+  log_info "Committing staged files to the develop branch."
+  git commit --message "Rename repository references after clone"
+
+  log_info "Creating the lineage.yml file."
+  cat << END_OF_LINE > .github/lineage.yml
+---
+lineage:
+  skeleton:
+    remote-url: https://github.com/${src_org}/${src_repo}.git
+version: '1'
+END_OF_LINE
+
+  log_info "Staging modified files."
+  git add --verbose .
+
+  log_info "Committing staged files to the develop branch."
+  git commit --message "Add lineage configuration"
+
+  log_info "Creating first-commits branch."
+  git checkout -b first-commits
+
+  remote_repo_status="unknown"
+  log_info "Checking for remote repository ${dest_org}/${dest_repo}."
+  remote_repo_name=$(gh repo view --json name --jq ".name" "${dest_org}/${dest_repo}") || :
+  if [[ -n ${remote_repo_name} ]]; then
+    log_ok "${dest_org}/${dest_repo} exists."
+    remote_repo_status="exists"
+  else
+    log_warn "${dest_org}/${dest_repo} does not yet exist."
+    log_info "Attempting to create a new remote repository."
+    # Note that gh will attempt to add the remote origin and will throw an error
+    # if it already exists.  We'll add the origin later if gh fails.
+    remote_repo_status="created"
+    gh repo create --public --confirm "${dest_org}/${dest_repo}" || remote_repo_status="failed"
+  fi
+
+  # Handle the different outcomes of the remote repository.
+  case $remote_repo_status in
+    created)
+      log_ok "The remote repository ${dest_org}/${dest_repo} was successfully created."
+      ;;&
+    exists | failed)
+      log_info "Adding a new remote origin for the repository."
+      # We can add the remote origin now since gh was unable to do it.
+      git remote add origin git@github.com:"${dest_org}/${dest_repo}".git
+      ;;&
+    created | exists)
+      log_info "Pushing develop and first-commit branches to the remote."
+      git push origin develop first-commits --set-upstream
+      log_info "Opening a new pull request for the first-commits branch."
+      log_info "If prompted, please select ${dest_org}/${dest_repo} as the base repository."
+      gh pr create --title "First commits" --assignee=@me --web
+      log_ok "Success!"
+      ;;
+    failed)
+      log_warn "The remote repository ${dest_org}/${dest_repo} counld not be created."
+      cat << END_OF_LINE
+${dest_org}/${dest_repo} was created locally from the ${src_repo} skeleton.
+A remote repository was unable to be created automatically.
+Please manually create the ${dest_org}/${dest_repo} repository on GitHub.
+
+Once ${dest_org}/${dest_repo} is created use the following commands to push
+the local repository to the remote and create the initial pull request:
+    cd ${CHANGE_DIR:+${CHANGE_DIR}/}${dest_repo}
+    git push origin develop first-commits --set-upstream
+    gh pr create --title "First commits" --assignee=@me --web
+
+END_OF_LINE
+      ;;
+  esac
+}
+
+# Initialize positional parameters and flag variables
+CHANGE_DIR=""
+PARAMS=""
+
+# Parse command line arguments
+while (("$#")); do
+  case "$1" in
+    -c | --change-dir)
+      CHANGE_DIR="$2"
+      shift
+      ;;
+    -d | --dest-org)
+      DEST_ORG="$2"
+      shift
+      ;;
+    -h | --help)
+      echo "${USAGE}"
+      exit 0
+      ;;
+    -s | --src-org)
+      SRC_ORG="$2"
+      shift
+      ;;
+    -*) # unsupported flags
+      echo "Error: Unsupported skeleton flag $1" >&2
+      exit 255
+      ;;
+    *) # preserve positional arguments
+      PARAMS="$PARAMS $1"
+      ;;
+  esac
+  shift
+done
+
+# set positional arguments in their proper place
+eval set -- "$PARAMS"
+
+case "$1" in
+  clone)
+    if [[ $# -lt 3 ]]; then
+      echo "Clone command requires <parent-repo-name> <new-repo-name>"
+      echo
+      echo "${USAGE}"
+      exit 255
+    fi
+    if [[ -n ${CHANGE_DIR} ]]; then
+      pushd "${CHANGE_DIR}" 1> /dev/null
+      clone_repo "$2" "$3" "${SRC_ORG}" "${DEST_ORG}"
+      popd 1> /dev/null
+    else
+      clone_repo "$2" "$3" "${SRC_ORG}" "${DEST_ORG}"
+    fi
+    ;;
+  list)
+    print_available_skeletons "${SRC_ORG}"
+    ;;
+  *)
+    echo "Unknown command $1"
+    echo "${USAGE}"
+    exit 255
+    ;;
+esac
