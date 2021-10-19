@@ -3,7 +3,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Default organizations
+# Defaults
 DEFAULT_BRANCH="develop"
 DEST_ORG="cisagov"
 SRC_ORG="cisagov"
