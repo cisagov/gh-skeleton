@@ -83,7 +83,7 @@ print_available_skeletons() {
 
   echo "Available skeletons in $src_org:"
   echo
-  exec gh api graphql \
+  gh api graphql \
     --raw-field query="${QUERY}" --paginate \
     --template="${TEMPLATE}" | sort
 }
