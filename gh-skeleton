@@ -3,7 +3,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Default organizations
+# Defaults
+DEFAULT_BRANCH="develop"
 DEST_ORG="cisagov"
 SRC_ORG="cisagov"
 
@@ -82,7 +83,7 @@ print_available_skeletons() {
 
   echo "Available skeletons in $src_org:"
   echo
-  exec gh api graphql \
+  gh api graphql \
     --raw-field query="${QUERY}" --paginate \
     --template="${TEMPLATE}" | sort
 }
@@ -118,7 +119,7 @@ clone_repo() {
   log_info "Staging modified files."
   git add --verbose .
 
-  log_info "Committing staged files to the develop branch."
+  log_info "Committing staged files to the ${DEFAULT_BRANCH} branch."
   git commit --message "Rename repository references after clone"
 
   log_info "Creating the lineage.yml file."
@@ -133,7 +134,7 @@ END_OF_LINE
   log_info "Staging modified files."
   git add --verbose .
 
-  log_info "Committing staged files to the develop branch."
+  log_info "Committing staged files to the ${DEFAULT_BRANCH} branch."
   git commit --message "Add lineage configuration"
 
   log_info "Creating first-commits branch."
@@ -165,15 +166,14 @@ END_OF_LINE
       git remote add origin git@github.com:"${dest_org}/${dest_repo}".git
       ;;&
     created | exists)
-      log_info "Pushing develop and first-commit branches to the remote."
-      git push origin develop first-commits --set-upstream
+      log_info "Pushing ${DEFAULT_BRANCH} and first-commit branches to the remote."
+      git push origin "${DEFAULT_BRANCH}" first-commits --set-upstream
       log_info "Opening a new pull request for the first-commits branch."
       log_info "If prompted, please select ${dest_org}/${dest_repo} as the base repository."
       gh pr create --title "First commits" --assignee=@me --web
-      log_ok "Success!"
       ;;
     failed)
-      log_warn "The remote repository ${dest_org}/${dest_repo} counld not be created."
+      log_warn "The remote repository ${dest_org}/${dest_repo} could not be created."
       cat << END_OF_LINE
 ${dest_org}/${dest_repo} was created locally from the ${src_repo} skeleton.
 A remote repository was unable to be created automatically.
@@ -182,12 +182,106 @@ Please manually create the ${dest_org}/${dest_repo} repository on GitHub.
 Once ${dest_org}/${dest_repo} is created use the following commands to push
 the local repository to the remote and create the initial pull request:
     cd ${CHANGE_DIR:+${CHANGE_DIR}/}${dest_repo}
-    git push origin develop first-commits --set-upstream
+    git push origin ${DEFAULT_BRANCH} first-commits --set-upstream
     gh pr create --title "First commits" --assignee=@me --web
 
 END_OF_LINE
+      exit 255
       ;;
   esac
+}
+
+configure_repo_options() {
+  dest_repo=$1
+  dest_org=$2
+  branch=$3
+
+  log_info "Configuring repository options for ${dest_org}/${dest_repo}."
+
+  jq -n "{
+      allow_auto_merge: false,
+      allow_merge_commit: true,
+      allow_rebase_merge: true,
+      allow_squash_merge: false,
+      default_branch: \"${branch}\",
+      delete_branch_on_merge: true,
+      private: false,
+      visibility: \"public\"
+    }" | gh api "/repos/${dest_org}/${dest_repo}" --method PATCH --input -
+}
+
+configure_branch_protection() {
+  dest_repo=$1
+  dest_org=$2
+  branch=$3
+
+  # Organizations have a different API than personal accounts.
+  # Determine what dest_org is pointing at and route to the appropriate function.
+
+  log_info "Determining organization type for $dest_org."
+  is_real_org=true
+  gh api "/orgs/$dest_org" --silent || is_real_org=false
+  if [ $is_real_org = true ]; then
+    configure_org_branch_protection "$dest_repo" "$dest_org" "$branch"
+  else
+    configure_user_branch_protection "$dest_repo" "$dest_org" "$branch"
+  fi
+}
+
+configure_org_branch_protection() {
+  dest_repo=$1
+  dest_org=$2
+  branch=$3
+
+  # Note: Only organization repositories can have users and team restrictions.
+
+  log_info "Configuring organization branch protection for ${dest_org}/${dest_repo}/${branch}."
+
+  jq -n "{
+      required_status_checks: {
+        strict: true,
+        contexts: [\"lint\", \"test\", \"CodeQL\"],
+      },
+      enforce_admins: true,
+      required_conversation_resolution: true,
+      required_pull_request_reviews: {
+        dismissal_restrictions: {
+          users: [],
+          teams: [],
+        },
+        dismiss_stale_reviews: false,
+        require_code_owner_reviews: true,
+        required_approving_review_count: 2,
+      },
+      restrictions: {
+        users: [],
+        teams: [],
+        apps: [],
+      },
+    }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input -
+}
+
+configure_user_branch_protection() {
+  dest_repo=$1
+  dest_org=$2
+  branch=$3
+
+  log_info "Configuring user branch protection for ${dest_org}/${dest_repo}/${branch}."
+
+  jq -n "{
+      required_status_checks: {
+        strict: true,
+        contexts: [\"lint\", \"test\", \"CodeQL\"],
+      },
+      enforce_admins: true,
+      required_conversation_resolution: true,
+      required_pull_request_reviews: {
+        dismiss_stale_reviews: false,
+        require_code_owner_reviews: true,
+        required_approving_review_count: 2,
+      },
+      restrictions: null,
+    }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input -
 }
 
 # Initialize positional parameters and flag variables
@@ -242,6 +336,9 @@ case "$1" in
     else
       clone_repo "$2" "$3" "${SRC_ORG}" "${DEST_ORG}"
     fi
+    configure_repo_options "$3" "${DEST_ORG}" "${DEFAULT_BRANCH}"
+    configure_branch_protection "$3" "${DEST_ORG}" "${DEFAULT_BRANCH}"
+    log_ok "Success!"
     ;;
   list)
     print_available_skeletons "${SRC_ORG}"
