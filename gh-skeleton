@@ -203,7 +203,7 @@ configure_repo_options() {
       allow_merge_commit: true,
       allow_rebase_merge: true,
       allow_squash_merge: false,
-      default_branch: \"$3\",
+      default_branch: \"${branch}\",
       delete_branch_on_merge: true,
       private: false,
       visibility: \"public\"
