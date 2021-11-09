@@ -288,7 +288,13 @@ configure_user_branch_protection() {
 CHANGE_DIR=""
 PARAMS=""
 
-# Parse command line arguments
+# If there are no arguments then print the usage and exit.
+if [ $# -eq 0 ]; then
+  echo "${USAGE}"
+  exit 0
+fi
+
+# Parse command line arguments.
 while (("$#")); do
   case "$1" in
     -c | --change-dir)
