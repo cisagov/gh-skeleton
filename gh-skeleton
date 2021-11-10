@@ -8,7 +8,7 @@ DEFAULT_BRANCH="develop"
 DEST_ORG="cisagov"
 SRC_ORG="cisagov"
 
-# Define terminal colors for use in logger functions
+# Define terminal colors for use in logger functions.
 BLUE="\x1B[34m"
 GREEN="\x1B[32m"
 RED="\x1B[31m"
@@ -284,11 +284,17 @@ configure_user_branch_protection() {
     }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input -
 }
 
-# Initialize positional parameters and flag variables
+# Initialize positional parameters and flag variables.
 CHANGE_DIR=""
 PARAMS=""
 
-# Parse command line arguments
+# If there are no arguments then print the usage and exit.
+if [ $# -eq 0 ]; then
+  echo "${USAGE}"
+  exit 0
+fi
+
+# Parse command line arguments.
 while (("$#")); do
   case "$1" in
     -c | --change-dir)
@@ -307,18 +313,18 @@ while (("$#")); do
       SRC_ORG="$2"
       shift
       ;;
-    -*) # unsupported flags
+    -*) # Handle unsupported flags.
       echo "Error: Unsupported skeleton flag $1" >&2
       exit 255
       ;;
-    *) # preserve positional arguments
+    *) # Preserve positional arguments.
       PARAMS="$PARAMS $1"
       ;;
   esac
   shift
 done
 
-# set positional arguments in their proper place
+# Set positional arguments in their proper place.
 eval set -- "$PARAMS"
 
 case "$1" in
