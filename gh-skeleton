@@ -225,10 +225,12 @@ configure_branch_protection() {
 
   log_info "Determining organization type for $dest_org."
   is_real_org=true
-  gh api "/orgs/$dest_org" --silent || is_real_org=false
+  gh api "/orgs/$dest_org" --silent 2> /dev/null || is_real_org=false
   if [ $is_real_org = true ]; then
+    log_ok "Organization $dest_org is a true organization."
     configure_org_branch_protection "$dest_repo" "$dest_org" "$branch"
   else
+    log_ok "Organization $dest_org is a personal account."
     configure_user_branch_protection "$dest_repo" "$dest_org" "$branch"
   fi
 }
