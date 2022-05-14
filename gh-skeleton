@@ -110,6 +110,11 @@ clone_repo() {
   log_info "Adding a new remote origin for the repository."
   git -C "${dest_repo}" remote add origin git@github.com:"${dest_org}/${dest_repo}".git
 
+  log_info "Setting base repository for pull request and issue creation."
+  # TODO: Replace with a gh command when it is implemented.
+  # See: https://github.com/cli/cli/issues/2300
+  git -C "${dest_repo}" config --local --add "remote.origin.gh-resolved" "base"
+
   cd "${dest_repo}"
 
   log_info "Disabling pushing to the upstream (parent) repository."
@@ -170,7 +175,6 @@ END_OF_LINE
       log_info "Pushing ${DEFAULT_BRANCH} and first-commit branches to the remote."
       git push origin "${DEFAULT_BRANCH}" first-commits --set-upstream
       log_info "Opening a new pull request for the first-commits branch."
-      log_info "If prompted, please select ${dest_org}/${dest_repo} as the base repository."
       gh pr create --title "First commits" --assignee=@me --web
       ;;
     failed)
