@@ -152,7 +152,7 @@ END_OF_LINE
     # Note that gh will attempt to add the remote origin and will throw an error
     # if it already exists.  We'll add the origin later if gh fails.
     remote_repo_status="created"
-    gh repo create --public --confirm "${dest_org}/${dest_repo}" || remote_repo_status="failed"
+    gh repo create --public "${dest_org}/${dest_repo}" || remote_repo_status="failed"
   fi
 
   # Handle the different outcomes of the remote repository.
