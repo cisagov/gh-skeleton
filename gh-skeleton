@@ -208,7 +208,7 @@ configure_repo_options() {
       delete_branch_on_merge: true,
       private: false,
       visibility: \"public\"
-    }" | gh api "/repos/${dest_org}/${dest_repo}" --method PATCH --input -
+    }" | gh api "/repos/${dest_org}/${dest_repo}" --method PATCH --input - 1> /dev/null
 }
 
 configure_branch_protection() {
@@ -259,7 +259,7 @@ configure_org_branch_protection() {
         teams: [],
         apps: [],
       },
-    }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input -
+    }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input - 1> /dev/null
 }
 
 configure_user_branch_protection() {
@@ -282,7 +282,7 @@ configure_user_branch_protection() {
         required_approving_review_count: 2,
       },
       restrictions: null,
-    }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input -
+    }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input - 1> /dev/null
 }
 
 # Initialize positional parameters and flag variables.
