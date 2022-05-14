@@ -107,6 +107,9 @@ clone_repo() {
   log_info "Cloning skeleton remote repository to the new local repository."
   git clone --origin "${src_repo}" git@github.com:"${src_org}/${src_repo}".git "${dest_repo}"
 
+  log_info "Adding a new remote origin for the repository."
+  git -C "${dest_repo}" remote add origin git@github.com:"${dest_org}/${dest_repo}".git
+
   cd "${dest_repo}"
 
   log_info "Disabling pushing to the upstream (parent) repository."
@@ -160,10 +163,8 @@ END_OF_LINE
     created)
       log_ok "The remote repository ${dest_org}/${dest_repo} was successfully created."
       ;;&
-    exists | failed)
-      log_info "Adding a new remote origin for the repository."
-      # We can add the remote origin now since gh was unable to do it.
-      git remote add origin git@github.com:"${dest_org}/${dest_repo}".git
+    exists)
+      log_info "The remote repository ${dest_org}/${dest_repo} already existed."
       ;;&
     created | exists)
       log_info "Pushing ${DEFAULT_BRANCH} and first-commit branches to the remote."
