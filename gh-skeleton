@@ -291,6 +291,10 @@ configure_user_branch_protection() {
     }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input - 1> /dev/null
 }
 
+################################################################################
+# Script execution begins here.
+################################################################################
+
 # Initialize positional parameters and flag variables.
 CHANGE_DIR=""
 PARAMS=""
