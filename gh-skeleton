@@ -157,8 +157,6 @@ END_OF_LINE
   else
     log_warn "${dest_org}/${dest_repo} does not yet exist."
     log_info "Attempting to create a new remote repository."
-    # Note that gh will attempt to add the remote origin and will throw an error
-    # if it already exists.  We'll add the origin later if gh fails.
     remote_repo_status="created"
     gh repo create --public "${dest_org}/${dest_repo}" || remote_repo_status="failed"
   fi
