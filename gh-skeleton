@@ -107,6 +107,14 @@ clone_repo() {
   log_info "Cloning skeleton remote repository to the new local repository."
   git clone --origin "${src_repo}" git@github.com:"${src_org}/${src_repo}".git "${dest_repo}"
 
+  log_info "Adding a new remote origin for the repository."
+  git -C "${dest_repo}" remote add origin git@github.com:"${dest_org}/${dest_repo}".git
+
+  log_info "Setting base repository for pull request and issue creation."
+  # TODO: Replace with a gh command when it is implemented.
+  # See: https://github.com/cli/cli/issues/2300
+  git -C "${dest_repo}" config --local --add "remote.origin.gh-resolved" "base"
+
   cd "${dest_repo}"
 
   log_info "Disabling pushing to the upstream (parent) repository."
@@ -149,10 +157,8 @@ END_OF_LINE
   else
     log_warn "${dest_org}/${dest_repo} does not yet exist."
     log_info "Attempting to create a new remote repository."
-    # Note that gh will attempt to add the remote origin and will throw an error
-    # if it already exists.  We'll add the origin later if gh fails.
     remote_repo_status="created"
-    gh repo create --public --confirm "${dest_org}/${dest_repo}" || remote_repo_status="failed"
+    gh repo create --public "${dest_org}/${dest_repo}" || remote_repo_status="failed"
   fi
 
   # Handle the different outcomes of the remote repository.
@@ -160,16 +166,13 @@ END_OF_LINE
     created)
       log_ok "The remote repository ${dest_org}/${dest_repo} was successfully created."
       ;;&
-    exists | failed)
-      log_info "Adding a new remote origin for the repository."
-      # We can add the remote origin now since gh was unable to do it.
-      git remote add origin git@github.com:"${dest_org}/${dest_repo}".git
+    exists)
+      log_info "The remote repository ${dest_org}/${dest_repo} already existed."
       ;;&
     created | exists)
       log_info "Pushing ${DEFAULT_BRANCH} and first-commit branches to the remote."
       git push origin "${DEFAULT_BRANCH}" first-commits --set-upstream
       log_info "Opening a new pull request for the first-commits branch."
-      log_info "If prompted, please select ${dest_org}/${dest_repo} as the base repository."
       gh pr create --title "First commits" --assignee=@me --web
       ;;
     failed)
@@ -207,7 +210,7 @@ configure_repo_options() {
       delete_branch_on_merge: true,
       private: false,
       visibility: \"public\"
-    }" | gh api "/repos/${dest_org}/${dest_repo}" --method PATCH --input -
+    }" | gh api "/repos/${dest_org}/${dest_repo}" --method PATCH --input - 1> /dev/null
 }
 
 configure_branch_protection() {
@@ -220,10 +223,12 @@ configure_branch_protection() {
 
   log_info "Determining organization type for $dest_org."
   is_real_org=true
-  gh api "/orgs/$dest_org" --silent || is_real_org=false
+  gh api "/orgs/$dest_org" --silent 2> /dev/null || is_real_org=false
   if [ $is_real_org = true ]; then
+    log_ok "Organization $dest_org is a true organization."
     configure_org_branch_protection "$dest_repo" "$dest_org" "$branch"
   else
+    log_ok "Organization $dest_org is a personal account."
     configure_user_branch_protection "$dest_repo" "$dest_org" "$branch"
   fi
 }
@@ -258,7 +263,7 @@ configure_org_branch_protection() {
         teams: [],
         apps: [],
       },
-    }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input -
+    }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input - 1> /dev/null
 }
 
 configure_user_branch_protection() {
@@ -281,8 +286,12 @@ configure_user_branch_protection() {
         required_approving_review_count: 2,
       },
       restrictions: null,
-    }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input -
+    }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input - 1> /dev/null
 }
+
+################################################################################
+# Script execution begins here.
+################################################################################
 
 # Initialize positional parameters and flag variables.
 CHANGE_DIR=""
