@@ -243,29 +243,29 @@ configure_org_branch_protection() {
   log_info "Configuring organization branch protection for ${dest_org}/${dest_repo}/${branch}."
 
   jq -n "{
+      enforce_admins: true,
+      required_conversation_resolution: true,
+      required_pull_request_reviews: {
+        dismiss_stale_reviews: false,
+        dismissal_restrictions: {
+          teams: [],
+          users: []
+        },
+        require_code_owner_reviews: true,
+        required_approving_review_count: 2
+      },
       required_status_checks: {
-        strict: true,
         checks: [
           {
             context: \"lint\"
           }
-        ]
-      },
-      enforce_admins: true,
-      required_conversation_resolution: true,
-      required_pull_request_reviews: {
-        dismissal_restrictions: {
-          users: [],
-          teams: []
-        },
-        dismiss_stale_reviews: false,
-        require_code_owner_reviews: true,
-        required_approving_review_count: 2
+        ],
+        strict: true
       },
       restrictions: {
-        users: [],
+        apps: [],
         teams: [],
-        apps: []
+        users: []
       }
     }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input - 1> /dev/null
 }
@@ -278,20 +278,20 @@ configure_user_branch_protection() {
   log_info "Configuring user branch protection for ${dest_org}/${dest_repo}/${branch}."
 
   jq -n "{
-      required_status_checks: {
-        strict: true,
-        checks: [
-          {
-            context: \"lint\"
-          }
-        ]
-      },
       enforce_admins: true,
       required_conversation_resolution: true,
       required_pull_request_reviews: {
         dismiss_stale_reviews: false,
         require_code_owner_reviews: true,
         required_approving_review_count: 2
+      },
+      required_status_checks: {
+        checks: [
+          {
+            context: \"lint\"
+          }
+        ],
+        strict: true
       },
       restrictions: null
     }" | gh api "/repos/${dest_org}/${dest_repo}/branches/${branch}/protection" --method PUT --input - 1> /dev/null
