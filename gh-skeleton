@@ -121,7 +121,7 @@ clone_repo() {
   git remote set-url --push "${src_repo}" no_push
 
   log_info "Searching and replacing repository name in source files."
-  find . -path './.git' -prune -o -type f -exec \
+  find . -path './.git' -prune -o -not -path './.github/dependabot.yml' -type f -exec \
     perl -pi -e "s/${src_repo}/${dest_repo}/g" {} \;
 
   log_info "Staging modified files."
