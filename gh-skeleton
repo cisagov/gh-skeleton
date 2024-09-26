@@ -133,15 +133,15 @@ clone_repo() {
 
   # Assigning the initial version
 
-  log_info "Creating an initial version 1.0.0 for the new repository."
+  log_info "Creating an initial version 0.0.1 for the new repository."
 
-  echo "1.0.0" > VERSION
+  echo "0.0.1" > VERSION
 
   log_info "Staging the version file."
   git add VERSION
 
-  log_info "Committing the inital version 1.0.0"
-  git commit --message "Set initial version to 1.0.0"
+  log_info "Committing the inital version 0.0.1"
+  git commit --message "Set initial version to 0.0.1"
 
   log_info "Creating the lineage.yml file."
   cat << END_OF_LINE > .github/lineage.yml
