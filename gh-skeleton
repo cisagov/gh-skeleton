@@ -131,6 +131,18 @@ clone_repo() {
   log_info "Committing staged files to the ${DEFAULT_BRANCH} branch."
   git commit --message "Rename repository references after clone"
 
+  # Assigning the initial version
+
+  log_info "Creating an initial version 1.0.0 for the new repository."
+
+  echo "1.0.0" > VERSION
+
+  log_info "Staging the version file."
+  git add VERSION
+
+  log_info "Committing the inital version 1.0.0"
+  git commit --message "Set initial version to 1.0.0"
+
   log_info "Creating the lineage.yml file."
   cat << END_OF_LINE > .github/lineage.yml
 ---
