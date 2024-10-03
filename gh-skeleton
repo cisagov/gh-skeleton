@@ -88,6 +88,69 @@ print_available_skeletons() {
     --template="${TEMPLATE}" | sort
 }
 
+# Function to read version files from .pre-commit-config.yaml
+get_version_files() {
+  # Check if .pre-commit-config.yaml exists
+  if [[ ! -f ".pre-commit-config.yaml" ]]; then
+    log_error ".pre-commit-config.yaml not found!"
+    exit 1
+  fi
+
+  # Read the repository URL from .pre-commit-config.yaml
+  log_info "Reading repository URL from .pre-commit-config.yaml"
+  bump_version_repo_url=$(yq e '.repos[0].repo' .pre-commit-config.yaml)
+
+  if [[ -z "$bump_version_repo_url" ]]; then
+    log_error "Repository URL not found in .pre-commit-config.yaml!"
+    exit 1
+  fi
+
+  # Define the path to the bump-version file in the repository
+  bump_version_url="${bump_version_repo_url}/raw/develop/bump-version"
+
+  # Download the bump-version.yaml file from the repository
+  log_info "Downloading bump version file from ${bump_version_url}"
+  curl -o bump-version.yaml "${bump_version_url}"
+
+  if [[ ! -f "bump-version" ]]; then
+    log_error "Failed to download bump-version.yaml file!"
+    exit 1
+  fi
+
+  # Extract the list of version files from the VERSION_FILE variable in bump-version.yaml
+  log_info "Reading VERSION_FILE from bump-version.yaml"
+  yq e '.VERSION_FILE[]' bump-version
+}
+
+# Set INITIAL_VERSION to 0.0.1 by default unless provided
+INITIAL_VERSION="${INITIAL_VERSION:-0.0.1}"
+
+# Function to update the version in all specified files
+update_version_in_files() {
+  local new_version=$1
+  local version_files=$(get_version_files)  # Assume this function fetches version files
+
+  for file in $version_files; do
+    if [[ -f "$file" ]]; then
+      log_info "Updating version in $file"
+      perl -pi -e "s/(version[:=]?\s*)[^\s\"']+/\\1$new_version/g" "$file"
+    else
+      log_warn "$file not found, skipping."
+    fi
+  done
+
+  log_info "Staging updated files."
+  git add --verbose .
+
+  log_info "Committing updated version files."
+  git commit --message "Set initial version to $new_version"
+}
+
+# Call the update_version_in_files function with INITIAL_VERSION
+log_info "Updating the initial version to $INITIAL_VERSION in all relevant files."
+update_version_in_files "$INITIAL_VERSION"
+
+
 clone_repo() {
   src_repo=$1
   dest_repo=$2
@@ -131,18 +194,6 @@ clone_repo() {
   log_info "Committing staged files to the ${DEFAULT_BRANCH} branch."
   git commit --message "Rename repository references after clone"
 
-  # Assigning the initial version
-
-  log_info "Creating an initial version 0.0.1 for the new repository."
-
-  echo "0.0.1" > VERSION
-
-  log_info "Staging the version file."
-  git add VERSION
-
-  log_info "Committing the inital version 0.0.1"
-  git commit --message "Set initial version to 0.0.1"
-
   log_info "Creating the lineage.yml file."
   cat << END_OF_LINE > .github/lineage.yml
 ---
@@ -183,8 +234,10 @@ END_OF_LINE
       log_info "The remote repository ${dest_org}/${dest_repo} already existed."
       ;;&
     created | exists)
-      log_info "Pushing ${DEFAULT_BRANCH} and first-commit branches to the remote."
-      git push origin "${DEFAULT_BRANCH}" first-commits --set-upstream
+      log_info "Pushing ${DEFAULT_BRANCH}, first-commits to the remote."
+      git push origin "${DEFAULT_BRANCH}" --set-upstream
+      git push origin first-commits --set-upstream
+      
       log_info "Opening a new pull request for the first-commits branch."
       gh pr create --title "First commits" --assignee=@me --web
       ;;
