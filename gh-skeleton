@@ -108,17 +108,17 @@ get_version_files() {
   # Define the path to the bump-version file in the repository
   bump_version_url="${bump_version_repo_url}/raw/develop/bump-version"
 
-  # Download the bump-version.yaml file from the repository
+  # Download the bump-version file from the repository
   log_info "Downloading bump version file from ${bump_version_url}"
-  curl -o bump-version.yaml "${bump_version_url}"
+  curl -o bump-version "${bump_version_url}"
 
   if [[ ! -f "bump-version" ]]; then
-    log_error "Failed to download bump-version.yaml file!"
+    log_error "Failed to download bump-version file!"
     exit 1
   fi
 
-  # Extract the list of version files from the VERSION_FILE variable in bump-version.yaml
-  log_info "Reading VERSION_FILE from bump-version.yaml"
+  # Extract the list of version files from the VERSION_FILE variable in bump-version
+  log_info "Reading VERSION_FILE from bump-version"
   yq e '.VERSION_FILE[]' bump-version
 }
 
@@ -128,7 +128,7 @@ INITIAL_VERSION="${INITIAL_VERSION:-0.0.1}"
 # Function to update the version in all specified files
 update_version_in_files() {
   local new_version=$1
-  local version_files=$(get_version_files)  # Assume this function fetches version files
+  local version_files=$(get_version_files)
 
   for file in $version_files; do
     if [[ -f "$file" ]]; then
@@ -145,6 +145,10 @@ update_version_in_files() {
   log_info "Committing updated version files."
   git commit --message "Set initial version to $new_version"
 }
+
+# Directly call the function without the log message
+update_version_in_files "$INITIAL_VERSION"
+
 
 # Call the update_version_in_files function with INITIAL_VERSION
 log_info "Updating the initial version to $INITIAL_VERSION in all relevant files."
