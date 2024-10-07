@@ -32,8 +32,8 @@ log_error() {
 }
 
 # Determine if an executable is in the PATH
-if ! type -p perl > /dev/null; then
-  log_error "Perl not found on the system and is required."
+if ! type -p sed > /dev/null; then
+  log_error "sed not found on the system and is required."
   exit 1
 fi
 
@@ -88,52 +88,35 @@ print_available_skeletons() {
     --template="${TEMPLATE}" | sort
 }
 
-# Function to read version files from .pre-commit-config.yaml
+# Function to read version files from current repository
 get_version_files() {
-  # Check if .pre-commit-config.yaml exists
-  if [[ ! -f ".pre-commit-config.yaml" ]]; then
-    log_error ".pre-commit-config.yaml not found!"
+  # Look for common version files in the current repository
+  log_info "Searching for common version files in the repository."
+
+  # You can add more file names as per your repository's convention
+  version_files=$(find . -maxdepth 2 -type f \( -name "README.md" -o -name "VERSION" -o -name "setup.py" -o -name "package.json" \))
+
+  if [[ -z "$version_files" ]]; then
+    log_error "No version files found!"
     exit 1
   fi
 
-  # Read the repository URL from .pre-commit-config.yaml
-  log_info "Reading repository URL from .pre-commit-config.yaml"
-  bump_version_repo_url=$(yq e '.repos[0].repo' .pre-commit-config.yaml)
-
-  if [[ -z "$bump_version_repo_url" ]]; then
-    log_error "Repository URL not found in .pre-commit-config.yaml!"
-    exit 1
-  fi
-
-  # Define the path to the bump-version file in the repository
-  bump_version_url="${bump_version_repo_url}/raw/develop/bump-version"
-
-  # Download the bump-version file from the repository
-  log_info "Downloading bump version file from ${bump_version_url}"
-  curl -o bump-version "${bump_version_url}"
-
-  if [[ ! -f "bump-version" ]]; then
-    log_error "Failed to download bump-version file!"
-    exit 1
-  fi
-
-  # Extract the list of version files from the VERSION_FILE variable in bump-version
-  log_info "Reading VERSION_FILE from bump-version"
-  yq e '.VERSION_FILE[]' bump-version
+  echo "$version_files"
 }
 
 # Set INITIAL_VERSION to 0.0.1 by default unless provided
 INITIAL_VERSION="${INITIAL_VERSION:-0.0.1}"
 
 # Function to update the version in all specified files
+# Function to update the version in all specified files
 update_version_in_files() {
   local new_version=$1
-  local version_files=$(get_version_files)
+  local version_files=$(get_version_files)  # Fetch version files from the repository
 
   for file in $version_files; do
     if [[ -f "$file" ]]; then
       log_info "Updating version in $file"
-      perl -pi -e "s/(version[:=]?\s*)[^\s\"']+/\\1$new_version/g" "$file"
+      sed -i "s/\(version[:=]\s*\)[^\s\"']*/\1$new_version/" "$file"
     else
       log_warn "$file not found, skipping."
     fi
@@ -145,6 +128,7 @@ update_version_in_files() {
   log_info "Committing updated version files."
   git commit --message "Set initial version to $new_version"
 }
+
 
 # Directly call the function without the log message
 update_version_in_files "$INITIAL_VERSION"
@@ -189,8 +173,8 @@ clone_repo() {
 
   log_info "Searching and replacing repository name in source files."
   find . -path './.git' -prune -o -not -path './.github/dependabot.yml' -type f \
-    -exec perl -pi -e "s/${src_org}\/${src_repo}/${dest_org}\/${dest_repo}/g" {} \; \
-    -exec perl -pi -e "s/${src_repo}/${dest_repo}/g" {} \;
+    -exec sed -i "s/${src_org}\/${src_repo}/${dest_org}\/${dest_repo}/g" {} \; \
+    -exec sed -i "s/${src_repo}/${dest_repo}/g" {} \;
 
   log_info "Staging modified files."
   git add --verbose .
