@@ -125,6 +125,38 @@ clone_repo() {
     -exec perl -pi -e "s/${src_org}\/${src_repo}/${dest_org}\/${dest_repo}/g" {} \; \
     -exec perl -pi -e "s/${src_repo}/${dest_repo}/g" {} \;
 
+  log_info "Checking for bump-version script."
+  if [ -f "./bump-version" ]; then
+    log_ok "bump-version script found. Resetting version to 0.0.1."
+
+    # Get the current version using bump-version
+    current_version=$(./bump-version show)
+    if [ -z "$current_version" ]; then
+      log_error "Failed to determine current version. Skipping version reset."
+    else
+      log_info "Current version is $current_version. Resetting to 0.0.1."
+
+      # List version files and reset the version to 0.0.1
+      version_files=$(./bump-version --list-files)
+      for version_file in $version_files; do
+        if [ -f "$version_file" ]; then
+          log_info "Resetting version in $version_file to 0.0.1."
+          # Replace the current version with 0.0.1
+          perl -pi -e "s/${current_version//./\.}/0.0.1/g" "$version_file"
+        else
+          log_warn "Expected version file $version_file not found."
+        fi
+      done
+
+      log_info "Staging version reset files."
+      git add --verbose $version_files
+      log_info "Committing version reset to the ${DEFAULT_BRANCH} branch."
+      git commit --message "Reset version to 0.0.1 for new repository"
+    fi
+  else
+    log_warn "bump-version script not found. Skipping version reset."
+  fi
+
   log_info "Staging modified files."
   git add --verbose .
 
