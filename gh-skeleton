@@ -149,7 +149,7 @@ clone_repo() {
       done
 
       log_info "Staging version reset files."
-      git add --verbose $version_files
+      git add --verbose "$version_files"
       log_info "Committing version reset to the ${DEFAULT_BRANCH} branch."
       git commit --message "Reset version to 0.0.1 for new repository"
     fi
