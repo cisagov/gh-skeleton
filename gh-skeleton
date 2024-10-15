@@ -134,6 +134,8 @@ clone_repo() {
     current_version=$(./bump-version show)
     if [ -z "$current_version" ]; then
       log_error "Failed to determine current version. Skipping version reset."
+    elif [ "$current_version" = "$VERSION_RESET" ]; then
+      log_ok "Current version is already ${VERSION_RESET}. Skipping version reset."
     else
       log_info "Current version is $current_version. Resetting to ${VERSION_RESET}."
 
