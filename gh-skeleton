@@ -139,9 +139,14 @@ clone_repo() {
     else
       log_info "Current version is $current_version. Resetting to ${VERSION_RESET}."
 
-      # List version files and reset the version to VERSION_RESET
-      version_files=$(./bump-version --list-files)
-      for version_file in $version_files; do
+      # Get the list of version files
+      version_files=()
+      while IFS= read -r line; do
+        version_files+=("$line")
+      done < <(./bump-version --list-files)
+
+      # Reset the version to VERSION_RESET for each version file
+      for version_file in "${version_files[@]}"; do
         if [ -f "$version_file" ]; then
           log_info "Resetting version in $version_file to ${VERSION_RESET}."
           # Replace the current version with VERSION_RESET
@@ -152,7 +157,7 @@ clone_repo() {
       done
 
       log_info "Staging version reset files."
-      git add --verbose "$version_files"
+      git add --verbose "${version_files[@]}"
       log_info "Committing version reset to the ${DEFAULT_BRANCH} branch."
       git commit --message "Reset version to ${VERSION_RESET} for new repository"
     fi
