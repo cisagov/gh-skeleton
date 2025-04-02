@@ -177,7 +177,7 @@ clone_repo() {
 lineage:
   skeleton:
     remote-url: https://github.com/${src_org}/${src_repo}.git
-version: '1'
+version: "1"
 END_OF_LINE
 
   log_info "Staging modified files."
