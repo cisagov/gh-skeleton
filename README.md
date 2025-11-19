@@ -1,6 +1,8 @@
 # gh-skeleton #
 
 [![GitHub Build Status](https://github.com/cisagov/gh-skeleton/workflows/build/badge.svg)](https://github.com/cisagov/gh-skeleton/actions)
+[![License](https://img.shields.io/github/license/cisagov/gh-skeleton)](https://spdx.org/licenses/)
+[![CodeQL](https://github.com/cisagov/gh-skeleton/workflows/CodeQL/badge.svg)](https://github.com/cisagov/gh-skeleton/actions/workflows/codeql-analysis.yml)
 
 This extension for the [`gh` CLI] provides the ability to easily start new projects
 from our [existing library of skeleton
