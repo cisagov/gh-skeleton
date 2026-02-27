@@ -189,7 +189,7 @@ func runClone(srcRepo, destRepo, srcOrg, destOrg, changeDir string, runner Comma
 		logOk("The remote repository %s/%s was successfully created.", destOrg, destRepo)
 		fallthrough
 	case "exists":
-		logInfo("Pushing %s and first-commit branches to the remote.", defaultBranch)
+		logInfo("Pushing %s and first-commits branches to the remote.", defaultBranch)
 		if _, err := runner.RunCommand(destRepoDir, "git", "push", "origin",
 			defaultBranch, "first-commits", "--set-upstream"); err != nil {
 			return fmt.Errorf("git push failed: %w", err)
@@ -225,6 +225,9 @@ func replaceInFiles(dir, srcOrg, srcRepo, destOrg, destRepo string) error {
 		}
 		if info.IsDir() {
 			base := info.Name()
+			// Skip .git and .github: .git contains internal git data and .github
+			// contains CI configuration that should not have repo refs replaced.
+			// Note: .github/lineage.yml is created fresh after this step.
 			if base == ".git" || base == ".github" {
 				return filepath.SkipDir
 			}
