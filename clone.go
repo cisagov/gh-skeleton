@@ -225,9 +225,10 @@ func replaceInFiles(dir, srcOrg, srcRepo, destOrg, destRepo string) error {
 		}
 		if info.IsDir() {
 			base := info.Name()
-			// Skip .git and .github: .git contains internal git data and .github
-			// contains CI configuration that should not have repo refs replaced.
-			// Note: .github/lineage.yml is created fresh after this step.
+			// Skip .git and .github, matching the original bash script behavior.
+			// .git contains internal git data. .github is skipped so that
+			// lineage.yml (which will be written fresh) and other CI
+			// configuration files are preserved as-is from the skeleton.
 			if base == ".git" || base == ".github" {
 				return filepath.SkipDir
 			}
