@@ -112,9 +112,7 @@ jobs:
       - id: setup-go
         uses: actions/setup-go@v6
         with:
-          # There is no expectation for actual Go code so we disable caching as
-          # it relies on the existence of a go.sum file.
-          cache: false
+          cache: true
           go-version: ${{ steps.setup-env.outputs.go-version }}
       - id: go-cache
         name: Lookup Go cache directory

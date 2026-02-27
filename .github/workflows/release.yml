@@ -1,0 +1,19 @@
+---
+name: release
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Create release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cli/gh-extension-precompile@v2
+        with:
+          go_version_file: go.mod
