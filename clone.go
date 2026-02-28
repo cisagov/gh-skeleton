@@ -146,7 +146,7 @@ func runClone(srcRepo, destRepo, srcOrg, destOrg, changeDir string, runner Comma
 	lineagePath := filepath.Join(destRepoDir, ".github", "lineage.yml")
 	lineageContent := fmt.Sprintf("---\nlineage:\n  skeleton:\n    remote-url: https://github.com/%s/%s.git\nversion: \"1\"\n",
 		srcOrg, srcRepo)
-	if err := os.WriteFile(lineagePath, []byte(lineageContent), 0o644); err != nil {
+	if err := os.WriteFile(lineagePath, []byte(lineageContent), 0o600); err != nil {
 		return fmt.Errorf("write lineage.yml failed: %w", err)
 	}
 
@@ -234,7 +234,7 @@ func replaceInFiles(dir, srcOrg, srcRepo, destOrg, destRepo string) error {
 			}
 			return nil
 		}
-		content, err := os.ReadFile(path)
+		content, err := os.ReadFile(filepath.Clean(path))
 		if err != nil {
 			// Skip unreadable files.
 			return nil
@@ -252,10 +252,15 @@ func replaceInFiles(dir, srcOrg, srcRepo, destOrg, destRepo string) error {
 }
 
 func replaceInFile(path, oldStr, newStr string) error {
-	content, err := os.ReadFile(path)
+	cleanPath := filepath.Clean(path)
+	info, err := os.Stat(cleanPath)
+	if err != nil {
+		return err
+	}
+	content, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return err
 	}
 	updated := strings.ReplaceAll(string(content), oldStr, newStr)
-	return os.WriteFile(path, []byte(updated), 0o644)
+	return os.WriteFile(cleanPath, []byte(updated), info.Mode())
 }

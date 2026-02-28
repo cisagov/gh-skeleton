@@ -70,7 +70,6 @@ query($query: String!) {
 	for _, r := range repos {
 		fmt.Fprintf(w, "%-25s\t%s\n", r.name, r.description)
 	}
-	w.Flush()
 
-	return nil
+	return w.Flush()
 }
