@@ -85,11 +85,12 @@ func runClone(srcRepo, destRepo, srcOrg, destOrg, changeDir string, runner Comma
 
 		currentVersion, err := runner.RunCommand(destRepoDir, "./bump-version", "show")
 		currentVersion = strings.TrimSpace(currentVersion)
-		if err != nil || currentVersion == "" {
+		switch {
+		case err != nil || currentVersion == "":
 			logError("Failed to determine current version. Skipping version reset.")
-		} else if currentVersion == versionReset {
+		case currentVersion == versionReset:
 			logOk("Current version is already %s. Skipping version reset.", versionReset)
-		} else {
+		default:
 			logInfo("Current version is %s. Resetting to %s.", currentVersion, versionReset)
 
 			listOutput, err := runner.RunCommand(destRepoDir, "./bump-version", "--list-files")

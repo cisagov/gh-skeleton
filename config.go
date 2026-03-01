@@ -55,7 +55,7 @@ func configureOrgBranchProtection(destRepo, destOrg, branch string, client RESTC
 	logInfo("Configuring organization branch protection for %s/%s/%s.", destOrg, destRepo, branch)
 
 	payload := map[string]interface{}{
-		"enforce_admins":                  true,
+		"enforce_admins":                   true,
 		"required_conversation_resolution": true,
 		"required_pull_request_reviews": map[string]interface{}{
 			"dismiss_stale_reviews": false,
@@ -63,8 +63,8 @@ func configureOrgBranchProtection(destRepo, destOrg, branch string, client RESTC
 				"teams": []interface{}{},
 				"users": []interface{}{},
 			},
-			"require_code_owner_reviews":       true,
-			"required_approving_review_count":   2,
+			"require_code_owner_reviews":      true,
+			"required_approving_review_count": 2,
 		},
 		"required_status_checks": map[string]interface{}{
 			"checks": []interface{}{
@@ -95,7 +95,7 @@ func configureUserBranchProtection(destRepo, destOrg, branch string, client REST
 	logInfo("Configuring user branch protection for %s/%s/%s.", destOrg, destRepo, branch)
 
 	payload := map[string]interface{}{
-		"enforce_admins":                  true,
+		"enforce_admins":                   true,
 		"required_conversation_resolution": true,
 		"required_pull_request_reviews": map[string]interface{}{
 			"dismiss_stale_reviews":           false,
