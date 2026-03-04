@@ -46,14 +46,14 @@ func main() {
 		case "-c", "--change-dir":
 			i++
 			if i >= len(args) {
-				fmt.Fprintf(os.Stderr, "Error: %s requires an argument\n", args[i-1])
+				fmt.Fprintf(os.Stderr, "Error: %s requires an argument\n", args[i-1]) // #nosec G705 -- writing CLI error to stderr
 				os.Exit(255)
 			}
 			changeDir = args[i]
 		case "-d", "--dest-org":
 			i++
 			if i >= len(args) {
-				fmt.Fprintf(os.Stderr, "Error: %s requires an argument\n", args[i-1])
+				fmt.Fprintf(os.Stderr, "Error: %s requires an argument\n", args[i-1]) // #nosec G705 -- writing CLI error to stderr
 				os.Exit(255)
 			}
 			destOrg = args[i]
@@ -63,13 +63,13 @@ func main() {
 		case "-s", "--src-org":
 			i++
 			if i >= len(args) {
-				fmt.Fprintf(os.Stderr, "Error: %s requires an argument\n", args[i-1])
+				fmt.Fprintf(os.Stderr, "Error: %s requires an argument\n", args[i-1]) // #nosec G705 -- writing CLI error to stderr
 				os.Exit(255)
 			}
 			srcOrg = args[i]
 		default:
 			if len(args[i]) > 0 && args[i][0] == '-' {
-				fmt.Fprintf(os.Stderr, "Error: Unsupported skeleton flag %s\n", args[i])
+				fmt.Fprintf(os.Stderr, "Error: Unsupported skeleton flag %s\n", args[i]) // #nosec G705 -- writing CLI error to stderr
 				os.Exit(255)
 			}
 			positional = append(positional, args[i])
@@ -126,7 +126,7 @@ func main() {
 		logOk("Success!")
 
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown command %s\n", command)
+		fmt.Fprintf(os.Stderr, "Unknown command %s\n", command) // #nosec G705 -- writing CLI error to stderr
 		fmt.Print(usage)
 		os.Exit(255)
 	}
