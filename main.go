@@ -18,6 +18,7 @@ var usage = `GitHub CLI extension to start a new GitHub project from a skeleton 
 
 Usage:
   gh skeleton (-h | --help)
+  gh skeleton (-V | --version)
   gh skeleton list [--src-org <name>]
   gh skeleton clone [options] <parent-repo-name> <new-repo-name>
 
@@ -26,6 +27,7 @@ Options:
   -d --dest-org <name>  Organization to create clone into [default: ` + defaultDestOrg + `].
   -h --help             Show this message.
   -s --src-org <name>   Organization to search for skeletons [default: ` + defaultSrcOrg + `].
+  -V --version          Show the version of this extension.
 `
 
 func main() {
@@ -59,6 +61,9 @@ func main() {
 			destOrg = args[i]
 		case "-h", "--help":
 			fmt.Print(usage)
+			os.Exit(0)
+		case "-V", "--version":
+			fmt.Println(version)
 			os.Exit(0)
 		case "-s", "--src-org":
 			i++
