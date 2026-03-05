@@ -7,9 +7,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	git "github.com/go-git/go-git/v5"
+	gitconfig "github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
+	gitssh "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
-// CommandRunner abstracts running external commands.
+// CommandRunner abstracts running external commands (used for bump-version and gh CLI).
 type CommandRunner interface {
 	RunCommand(dir, name string, args ...string) (string, error)
 }
@@ -28,6 +33,28 @@ func (r *execRunner) RunCommand(dir, name string, args ...string) (string, error
 		return "", fmt.Errorf("%w: %s", err, stderr.String())
 	}
 	return strings.TrimRight(stdout.String(), "\n"), nil
+}
+
+// getSSHAuth returns the best available SSH authentication method.
+func getSSHAuth() (gitssh.AuthMethod, error) {
+	// Try SSH agent first.
+	auth, err := gitssh.NewSSHAgentAuth("git")
+	if err == nil {
+		return auth, nil
+	}
+	// Fall back to common key files.
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("no SSH authentication available: %w", err)
+	}
+	for _, keyFile := range []string{"id_ed25519", "id_rsa", "id_ecdsa", "id_dsa"} {
+		keyPath := filepath.Join(homeDir, ".ssh", keyFile) // #nosec G304 -- path built from home dir and hardcoded filename
+		auth, err := gitssh.NewPublicKeysFromFile("git", keyPath, "")
+		if err == nil {
+			return auth, nil
+		}
+	}
+	return nil, fmt.Errorf("no SSH authentication available: ssh-agent not running and no default key files found")
 }
 
 func runClone(srcRepo, destRepo, srcOrg, destOrg, changeDir string, runner CommandRunner, client RESTClient) error {
@@ -49,33 +76,51 @@ func runClone(srcRepo, destRepo, srcOrg, destOrg, changeDir string, runner Comma
 	}
 	destRepoDir := filepath.Join(cloneDir, destRepo)
 
+	// Set up SSH auth for git operations.
+	sshAuth, err := getSSHAuth()
+	if err != nil {
+		return fmt.Errorf("SSH auth setup failed: %w", err)
+	}
+
 	logInfo("Cloning skeleton remote repository to the new local repository.")
-	if _, err := runner.RunCommand(cloneDir, "git", "clone", "--origin", srcRepo,
-		"git@github.com:"+srcOrg+"/"+srcRepo+".git", destRepo); err != nil {
+	repo, err := git.PlainClone(destRepoDir, false, &git.CloneOptions{
+		URL:        "git@github.com:" + srcOrg + "/" + srcRepo + ".git",
+		RemoteName: srcRepo,
+		Auth:       sshAuth,
+	})
+	if err != nil {
 		return fmt.Errorf("git clone failed: %w", err)
 	}
 
 	logInfo("Adding a new remote origin for the repository.")
-	if _, err := runner.RunCommand(destRepoDir, "git", "remote", "add", "origin",
-		"git@github.com:"+destOrg+"/"+destRepo+".git"); err != nil {
+	if _, err := repo.CreateRemote(&gitconfig.RemoteConfig{
+		Name: "origin",
+		URLs: []string{"git@github.com:" + destOrg + "/" + destRepo + ".git"},
+	}); err != nil {
 		return fmt.Errorf("git remote add failed: %w", err)
 	}
 
 	logInfo("Setting base repository for pull request and issue creation.")
-	if _, err := runner.RunCommand(destRepoDir, "git", "config", "--local", "--add",
-		"remote.origin.gh-resolved", "base"); err != nil {
-		return fmt.Errorf("git config failed: %w", err)
-	}
-
 	logInfo("Disabling pushing to the upstream (parent) repository.")
-	if _, err := runner.RunCommand(destRepoDir, "git", "remote", "set-url", "--push",
-		srcRepo, "no_push"); err != nil {
-		return fmt.Errorf("git remote set-url failed: %w", err)
+	cfg, err := repo.Config()
+	if err != nil {
+		return fmt.Errorf("failed to get repo config: %w", err)
+	}
+	cfg.Raw.AddOption("remote", "origin", "gh-resolved", "base")
+	cfg.Raw.SetOption("remote", srcRepo, "pushurl", "no_push")
+	if err := repo.SetConfig(cfg); err != nil {
+		return fmt.Errorf("failed to set repo config: %w", err)
 	}
 
 	logInfo("Searching and replacing repository name in source files.")
 	if err := replaceInFiles(destRepoDir, srcOrg, srcRepo, destOrg, destRepo); err != nil {
 		return fmt.Errorf("replaceInFiles failed: %w", err)
+	}
+
+	// Get worktree for subsequent git operations.
+	w, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
 	logInfo("Checking for bump-version script.")
@@ -117,14 +162,14 @@ func runClone(srcRepo, destRepo, srcOrg, destOrg, changeDir string, runner Comma
 			}
 
 			logInfo("Staging version reset files.")
-			gitAddArgs := append([]string{"add", "--verbose"}, versionFiles...)
-			if _, err := runner.RunCommand(destRepoDir, "git", gitAddArgs...); err != nil {
-				return fmt.Errorf("git add version files failed: %w", err)
+			for _, vf := range versionFiles {
+				if _, err := w.Add(vf); err != nil {
+					return fmt.Errorf("git add version file %s failed: %w", vf, err)
+				}
 			}
 
 			logInfo("Committing version reset to the %s branch.", defaultBranch)
-			if _, err := runner.RunCommand(destRepoDir, "git", "commit", "--message",
-				"Reset version to "+versionReset+" for new repository"); err != nil {
+			if _, err := w.Commit("Reset version to "+versionReset+" for new repository", &git.CommitOptions{}); err != nil {
 				return fmt.Errorf("git commit version reset failed: %w", err)
 			}
 		}
@@ -133,13 +178,12 @@ func runClone(srcRepo, destRepo, srcOrg, destOrg, changeDir string, runner Comma
 	}
 
 	logInfo("Staging modified files.")
-	if _, err := runner.RunCommand(destRepoDir, "git", "add", "--verbose", "."); err != nil {
+	if err := w.AddWithOptions(&git.AddOptions{All: true}); err != nil {
 		return fmt.Errorf("git add failed: %w", err)
 	}
 
 	logInfo("Committing staged files to the %s branch.", defaultBranch)
-	if _, err := runner.RunCommand(destRepoDir, "git", "commit", "--message",
-		"Rename repository references after clone"); err != nil {
+	if _, err := w.Commit("Rename repository references after clone", &git.CommitOptions{}); err != nil {
 		return fmt.Errorf("git commit rename failed: %w", err)
 	}
 
@@ -152,18 +196,20 @@ func runClone(srcRepo, destRepo, srcOrg, destOrg, changeDir string, runner Comma
 	}
 
 	logInfo("Staging modified files.")
-	if _, err := runner.RunCommand(destRepoDir, "git", "add", "--verbose", "."); err != nil {
+	if err := w.AddWithOptions(&git.AddOptions{All: true}); err != nil {
 		return fmt.Errorf("git add lineage failed: %w", err)
 	}
 
 	logInfo("Committing staged files to the %s branch.", defaultBranch)
-	if _, err := runner.RunCommand(destRepoDir, "git", "commit", "--message",
-		"Add lineage configuration"); err != nil {
+	if _, err := w.Commit("Add lineage configuration", &git.CommitOptions{}); err != nil {
 		return fmt.Errorf("git commit lineage failed: %w", err)
 	}
 
 	logInfo("Creating first-commits branch.")
-	if _, err := runner.RunCommand(destRepoDir, "git", "checkout", "-b", "first-commits"); err != nil {
+	if err := w.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName("first-commits"),
+		Create: true,
+	}); err != nil {
 		return fmt.Errorf("git checkout -b first-commits failed: %w", err)
 	}
 
@@ -191,9 +237,30 @@ func runClone(srcRepo, destRepo, srcOrg, destOrg, changeDir string, runner Comma
 		fallthrough
 	case "exists":
 		logInfo("Pushing %s and first-commits branches to the remote.", defaultBranch)
-		if _, err := runner.RunCommand(destRepoDir, "git", "push", "origin",
-			defaultBranch, "first-commits", "--set-upstream"); err != nil {
-			return fmt.Errorf("git push failed: %w", err)
+		pushErr := repo.Push(&git.PushOptions{
+			RemoteName: "origin",
+			RefSpecs: []gitconfig.RefSpec{
+				gitconfig.RefSpec("refs/heads/" + defaultBranch + ":refs/heads/" + defaultBranch),
+				gitconfig.RefSpec("refs/heads/first-commits:refs/heads/first-commits"),
+			},
+			Auth: sshAuth,
+		})
+		if pushErr != nil {
+			return fmt.Errorf("git push failed: %w", pushErr)
+		}
+		// Set tracking info (equivalent to --set-upstream).
+		if pushCfg, err := repo.Config(); err == nil {
+			pushCfg.Branches[defaultBranch] = &gitconfig.Branch{
+				Name:   defaultBranch,
+				Remote: "origin",
+				Merge:  plumbing.NewBranchReferenceName(defaultBranch),
+			}
+			pushCfg.Branches["first-commits"] = &gitconfig.Branch{
+				Name:   "first-commits",
+				Remote: "origin",
+				Merge:  plumbing.NewBranchReferenceName("first-commits"),
+			}
+			_ = repo.SetConfig(pushCfg)
 		}
 		logInfo("Opening a new pull request for the first-commits branch.")
 		if _, err := runner.RunCommand(destRepoDir, "gh", "pr", "create",
