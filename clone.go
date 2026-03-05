@@ -2,19 +2,22 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	ghbrowser "github.com/cli/go-gh/v2/pkg/browser"
 	git "github.com/go-git/go-git/v5"
 	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	gitssh "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
-// CommandRunner abstracts running external commands (used for bump-version and gh CLI).
+// CommandRunner abstracts running external commands (used for bump-version).
 type CommandRunner interface {
 	RunCommand(dir, name string, args ...string) (string, error)
 }
@@ -55,6 +58,28 @@ func getSSHAuth() (gitssh.AuthMethod, error) {
 		}
 	}
 	return nil, fmt.Errorf("no SSH authentication available: ssh-agent not running and no default key files found")
+}
+
+// createRemoteRepo creates a new public repository on GitHub using the REST API.
+// It tries to create in the organization first; if that fails, it falls back to the
+// authenticated user's account.
+func createRemoteRepo(destRepo, destOrg string, client RESTClient) error {
+	payload := map[string]interface{}{
+		"name":    destRepo,
+		"private": false,
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("json marshal failed: %w", err)
+	}
+
+	var resp interface{}
+	// Try organization endpoint first.
+	if err := client.Post("orgs/"+destOrg+"/repos", bytes.NewReader(data), &resp); err == nil {
+		return nil
+	}
+	// Fall back to user endpoint (for personal accounts).
+	return client.Post("user/repos", bytes.NewReader(data), &resp)
 }
 
 func runClone(srcRepo, destRepo, srcOrg, destOrg, changeDir string, runner CommandRunner, client RESTClient) error {
@@ -214,18 +239,19 @@ func runClone(srcRepo, destRepo, srcOrg, destOrg, changeDir string, runner Comma
 	}
 
 	// Check if remote repo exists.
-	repoName, err := runner.RunCommand("", "gh", "repo", "view", "--json", "name", "--jq", ".name",
-		destOrg+"/"+destRepo)
+	var repoResp struct {
+		Name string
+	}
+	repoExists := client.Get("repos/"+destOrg+"/"+destRepo, &repoResp) == nil
 	status := "unknown"
-	if err == nil && strings.TrimSpace(repoName) != "" {
+	if repoExists {
 		logOk("%s/%s exists.", destOrg, destRepo)
 		status = "exists"
 	} else {
 		logWarn("%s/%s does not yet exist.", destOrg, destRepo)
 		logInfo("Attempting to create a new remote repository.")
 		status = "created"
-		if _, err := runner.RunCommand("", "gh", "repo", "create", "--public",
-			destOrg+"/"+destRepo); err != nil {
+		if err := createRemoteRepo(destRepo, destOrg, client); err != nil {
 			logWarn("The remote repository %s/%s could not be created.", destOrg, destRepo)
 			status = "failed"
 		}
@@ -263,9 +289,13 @@ func runClone(srcRepo, destRepo, srcOrg, destOrg, changeDir string, runner Comma
 			_ = repo.SetConfig(pushCfg)
 		}
 		logInfo("Opening a new pull request for the first-commits branch.")
-		if _, err := runner.RunCommand(destRepoDir, "gh", "pr", "create",
-			"--title", "First commits", "--assignee=@me", "--web"); err != nil {
-			return fmt.Errorf("gh pr create failed: %w", err)
+		prURL := "https://github.com/" + destOrg + "/" + destRepo +
+			"/compare/" + defaultBranch + "...first-commits" +
+			"?quick_pull=1&title=" + url.QueryEscape("First commits") +
+			"&assignees=" + url.QueryEscape(user.Login)
+		b := ghbrowser.New("", os.Stdout, os.Stderr)
+		if err := b.Browse(prURL); err != nil {
+			return fmt.Errorf("opening pull request in browser failed: %w", err)
 		}
 	case "failed":
 		cdDir := destRepo

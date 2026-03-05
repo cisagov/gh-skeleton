@@ -11,6 +11,7 @@ import (
 type RESTClient interface {
 	Get(path string, resp interface{}) error
 	Patch(path string, body io.Reader, resp interface{}) error
+	Post(path string, body io.Reader, resp interface{}) error
 	Put(path string, body io.Reader, resp interface{}) error
 }
 

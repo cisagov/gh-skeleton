@@ -18,12 +18,17 @@ type mockRESTClient struct {
 		path string
 		body string
 	}
+	postCalls []struct {
+		path string
+		body string
+	}
 	putCalls []struct {
 		path string
 		body string
 	}
 	getErr   error
 	patchErr error
+	postErr  error
 	putErr   error
 }
 
@@ -43,6 +48,15 @@ func (m *mockRESTClient) Patch(path string, body io.Reader, resp interface{}) er
 		body string
 	}{path, string(data)})
 	return m.patchErr
+}
+
+func (m *mockRESTClient) Post(path string, body io.Reader, resp interface{}) error {
+	data, _ := io.ReadAll(body)
+	m.postCalls = append(m.postCalls, struct {
+		path string
+		body string
+	}{path, string(data)})
+	return m.postErr
 }
 
 func (m *mockRESTClient) Put(path string, body io.Reader, resp interface{}) error {
