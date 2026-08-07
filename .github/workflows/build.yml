@@ -109,9 +109,7 @@ jobs:
       - id: setup-go
         uses: actions/setup-go@v7
         with:
-          # There is no expectation for actual Go code so we disable caching as
-          # it relies on the existence of a go.sum file.
-          cache: false
+          cache: true
           go-version: ${{ steps.setup-env.outputs.go-version }}
       - id: go-dirs
         name: Lookup Go directories to cache
@@ -184,6 +182,140 @@ jobs:
         run: pre-commit install-hooks
       - name: Run pre-commit on all files
         run: pre-commit run --all-files
+      - name: Setup tmate debug session
+        uses: mxschmitt/action-tmate@v3
+        if: env.RUN_TMATE
+  test:
+    needs:
+      - diagnostics
+    permissions:
+      # actions/checkout needs this to fetch code
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply standard cisagov job preamble
+        uses: cisagov/action-job-preamble@v1
+        with:
+          # This functionality is poorly implemented and has been
+          # causing problems due to the MITM implementation hogging or
+          # leaking memory.  As a result we disable it by default.  If
+          # you want to temporarily enable it, simply set
+          # monitor_permissions equal to "true".
+          #
+          # TODO: Re-enable this functionality when practical.  See
+          # cisagov/skeleton-generic#207 for more details.
+          monitor_permissions: "false"
+          # Use a variable to specify the permissions monitoring
+          # configuration. By default this will yield the
+          # configuration stored in the cisagov organization-level
+          # variable, but if you want to use a different configuration
+          # then simply:
+          # 1. Create a repository-level variable with the name
+          # ACTIONS_PERMISSIONS_CONFIG.
+          # 2. Set this new variable's value to the configuration you
+          # want to use for this repository.
+          #
+          # Note in particular that changing the permissions
+          # monitoring configuration *does not* require you to modify
+          # this workflow.
+          permissions_monitoring_config: ${{ vars.ACTIONS_PERMISSIONS_CONFIG }}
+      - id: setup-env
+        uses: cisagov/setup-env-github-action@v1
+      - uses: actions/checkout@v6
+      # We need the Go version and Go cache location for the actions/cache step,
+      # so the Go installation must happen before that.
+      - id: setup-go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version: ${{ steps.setup-env.outputs.go-version }}
+      - id: go-cache
+        name: Lookup Go cache directory
+        run: |
+          echo "dir=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v5
+        env:
+          BASE_CACHE_KEY: >-
+            ${{ github.job }}-${{ runner.os
+            }}-go${{ steps.setup-go.outputs.go-version }}-
+        with:
+          key: >-
+            ${{ env.BASE_CACHE_KEY }}${{
+            hashFiles('**/go.sum') }}
+          path: |
+            ${{ steps.go-cache.outputs.dir }}
+          restore-keys: |
+            ${{ env.BASE_CACHE_KEY }}
+      - name: Run Go tests
+        run: go test ./...
+      - name: Setup tmate debug session
+        uses: mxschmitt/action-tmate@v3
+        if: env.RUN_TMATE
+  build:
+    needs:
+      - diagnostics
+      - lint
+      - test
+    permissions:
+      # actions/checkout needs this to fetch code
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply standard cisagov job preamble
+        uses: cisagov/action-job-preamble@v1
+        with:
+          # This functionality is poorly implemented and has been
+          # causing problems due to the MITM implementation hogging or
+          # leaking memory.  As a result we disable it by default.  If
+          # you want to temporarily enable it, simply set
+          # monitor_permissions equal to "true".
+          #
+          # TODO: Re-enable this functionality when practical.  See
+          # cisagov/skeleton-generic#207 for more details.
+          monitor_permissions: "false"
+          # Use a variable to specify the permissions monitoring
+          # configuration. By default this will yield the
+          # configuration stored in the cisagov organization-level
+          # variable, but if you want to use a different configuration
+          # then simply:
+          # 1. Create a repository-level variable with the name
+          # ACTIONS_PERMISSIONS_CONFIG.
+          # 2. Set this new variable's value to the configuration you
+          # want to use for this repository.
+          #
+          # Note in particular that changing the permissions
+          # monitoring configuration *does not* require you to modify
+          # this workflow.
+          permissions_monitoring_config: ${{ vars.ACTIONS_PERMISSIONS_CONFIG }}
+      - id: setup-env
+        uses: cisagov/setup-env-github-action@v1
+      - uses: actions/checkout@v6
+      # We need the Go version and Go cache location for the actions/cache step,
+      # so the Go installation must happen before that.
+      - id: setup-go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version: ${{ steps.setup-env.outputs.go-version }}
+      - id: go-cache
+        name: Lookup Go cache directory
+        run: |
+          echo "dir=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v5
+        env:
+          BASE_CACHE_KEY: >-
+            ${{ github.job }}-${{ runner.os
+            }}-go${{ steps.setup-go.outputs.go-version }}-
+        with:
+          key: >-
+            ${{ env.BASE_CACHE_KEY }}${{
+            hashFiles('**/go.sum') }}
+          path: |
+            ${{ steps.go-cache.outputs.dir }}
+          restore-keys: |
+            ${{ env.BASE_CACHE_KEY }}
+      - name: Build Go application
+        run: go build ./...
       - name: Setup tmate debug session
         uses: mxschmitt/action-tmate@v3
         if: env.RUN_TMATE

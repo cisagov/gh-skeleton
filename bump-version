@@ -7,8 +7,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Stores the canonical version for the project.
-VERSION_FILE=version.txt
+# Go source file containing the version constant for the project.
+VERSION_FILE=version.go
 # Files that should be updated with the new version.
 VERSION_FILES=("$VERSION_FILE")
 
@@ -29,7 +29,7 @@ Options:
 END_OF_LINE
 )
 
-old_version=$(< "$VERSION_FILE")
+old_version=$(sed -n 's/^[[:space:]]*const version = "\(.*\)"[[:space:]]*$/\1/p' "$VERSION_FILE")
 # Comment out periods so they are interpreted as periods and don't
 # just match any character
 old_version_regex=${old_version//\./\\\.}
